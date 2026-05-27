@@ -5,7 +5,7 @@ const path = require("path");
 
 // ─── CONFIGURATION ── change these three values ──────────────
 const OWNER = "A53o";
-const REPO = "BlogPostTes";
+const REPO = "BlogPostTest";
 const YOUR_USERNAME = "A53o";
 // ──────────────────────────────────────────────────────────────
 
@@ -99,14 +99,23 @@ async function generatePosts() {
       const date = post.created_at.split("T")[0];
       const rawMarkdown = post.body || "";
 
-      // ── NEW: Extract the first image from Markdown ───
+      // ── Extract the first image from Markdown or HTML ───
       let imageHtml = "";
-      const imgRegex = /!\[[^\]]*\]\(([^)\s]+(?:\s"[^"]*")?)\)/;   // match ![alt](url)
-      const imgMatch = rawMarkdown.match(imgRegex);
-      if (imgMatch) {
-        // imgMatch[1] is the URL (ignoring optional title)
-        const imageUrl = imgMatch[1];
+
+      // 1) Try HTML <img> tag (GitHub's default paste style)
+      const htmlImgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/i;
+      const htmlMatch = rawMarkdown.match(htmlImgRegex);
+      if (htmlMatch) {
+        const imageUrl = htmlMatch[1];
         imageHtml = `<img src="${imageUrl}" alt="Post preview" class="post-image" loading="lazy">`;
+      } else {
+        // 2) Fallback to Markdown ![alt](url)
+        const mdImgRegex = /!\[[^\]]*\]\(([^)\s]+(?:\s"[^"]*")?)\)/;
+        const mdMatch = rawMarkdown.match(mdImgRegex);
+        if (mdMatch) {
+          const imageUrl = mdMatch[1];
+          imageHtml = `<img src="${imageUrl}" alt="Post preview" class="post-image" loading="lazy">`;
+        }
       }
       // ──────────────────────────────────────────────────
 
