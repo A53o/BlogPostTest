@@ -4,9 +4,9 @@ const fs = require("fs");
 const path = require("path");
 
 // ─── CONFIGURATION ── Change these three values ──────────────
-const OWNER = "your-github-username";        // your GitHub username
-const REPO = "my-blog";                      // this repository name
-const YOUR_USERNAME = "your-github-username"; // the only allowed issue author
+const OWNER = "A53o";        // your GitHub username
+const REPO = "BlogPostTest";                      // this repository name
+const YOUR_USERNAME = "A53o"; // the only allowed issue author
 // ──────────────────────────────────────────────────────────────
 
 const TOKEN = process.env.GITHUB_TOKEN;
