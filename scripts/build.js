@@ -1,6 +1,5 @@
 const { Octokit } = require("@octokit/rest");
 const markdownIt = require("markdown-it");
-const { markdownToTxt } = require("markdown-to-txt");
 const fs = require("fs");
 const path = require("path");
 
@@ -19,7 +18,6 @@ if (!TOKEN) {
 const octokit = new Octokit({ auth: TOKEN });
 const md = new markdownIt({ html: true });
 
-// Helper: escape HTML to prevent XSS
 function escapeHtml(text) {
   return text
     .replace(/&/g, "&amp;")
@@ -29,7 +27,6 @@ function escapeHtml(text) {
     .replace(/'/g, "&#039;");
 }
 
-// Helper: create a safe filename (slug) from a title
 function slugify(title) {
   return title
     .toLowerCase()
@@ -48,7 +45,7 @@ async function generatePosts() {
     per_page: 100,
   });
 
-  // Security: only keep issues created by YOU (ignore pull requests)
+  // Security: only your issues
   const myPosts = issues.filter(
     (issue) =>
       issue.user.login === YOUR_USERNAME && !issue.pull_request
@@ -56,19 +53,17 @@ async function generatePosts() {
 
   console.log(`Found ${myPosts.length} post(s) from you.`);
 
-  // Prepare output directory for individual posts
   const outDir = path.join(__dirname, "..", "posts");
   if (!fs.existsSync(outDir)) {
     fs.mkdirSync(outDir, { recursive: true });
   }
 
-  // Load the individual post template
   const postTemplate = fs.readFileSync(
     path.join(__dirname, "..", "template.html"),
     "utf8"
   );
 
-  // --- Step 1: Generate each post page ---
+  // Generate individual post pages
   for (const issue of myPosts) {
     const contentHtml = md.render(issue.body || "");
     const pageHtml = postTemplate
@@ -82,12 +77,8 @@ async function generatePosts() {
     console.log(`✔ Created posts/${slug}.html`);
   }
 
-  // --- Step 2: Build the homepage with excerpt cards ---
-  // Sort by creation date, newest first
-  myPosts.sort(
-    (a, b) => new Date(b.created_at) - new Date(a.created_at)
-  );
-
+  // Build homepage with excerpt cards
+  myPosts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   const recentPosts = myPosts.slice(0, 3);
 
   let postListHtml = "";
@@ -100,9 +91,10 @@ async function generatePosts() {
       const date = post.created_at.split("T")[0];
       const rawMarkdown = post.body || "";
 
-      // Generate a plain‑text excerpt (first 160 characters)
-      let excerpt = markdownToTxt(rawMarkdown).substring(0, 160);
-      if (markdownToTxt(rawMarkdown).length > 160) excerpt += "…";
+      // Convert Markdown → HTML, then strip all tags to get plain text
+      let plainText = md.render(rawMarkdown).replace(/<[^>]*>/g, "").trim();
+      let excerpt = plainText.substring(0, 160);
+      if (plainText.length > 160) excerpt += "…";
 
       postListHtml += `
         <article class="post-card">
@@ -115,18 +107,13 @@ async function generatePosts() {
     postListHtml += "</div>";
   }
 
-  // Load the homepage template and insert the list
   const homeTemplate = fs.readFileSync(
     path.join(__dirname, "..", "home.html"),
     "utf8"
   );
   const homePageHtml = homeTemplate.replace(/{{POST_LIST}}/g, postListHtml);
 
-  // Write it as index.html (the actual homepage)
-  fs.writeFileSync(
-    path.join(__dirname, "..", "index.html"),
-    homePageHtml
-  );
+  fs.writeFileSync(path.join(__dirname, "..", "index.html"), homePageHtml);
   console.log("✔ Generated index.html with recent posts");
 }
 
