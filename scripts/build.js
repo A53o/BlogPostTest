@@ -4,9 +4,9 @@ const fs = require("fs");
 const path = require("path");
 
 // ─── CONFIGURATION ── change these three values ──────────────
-const OWNER = "A53o";
-const REPO = "BlogPostTest";
-const YOUR_USERNAME = "A53o";
+const OWNER = "your-github-username";
+const REPO = "my-blog";
+const YOUR_USERNAME = "your-github-username";
 // ──────────────────────────────────────────────────────────────
 
 const TOKEN = process.env.GITHUB_TOKEN;
@@ -18,7 +18,6 @@ if (!TOKEN) {
 const octokit = new Octokit({ auth: TOKEN });
 const md = new markdownIt({ html: true });
 
-// Helpers
 function escapeHtml(text) {
   return text
     .replace(/&/g, "&amp;")
@@ -46,11 +45,9 @@ function decodeHtmlEntities(text) {
 }
 
 function extractFirstImage(rawMarkdown) {
-  // Try HTML <img> tag first (GitHub's default paste style)
   const htmlImgRegex = /<img\b[^>]*?src=["']([^"']+)["'][^>]*>/i;
   const htmlMatch = rawMarkdown.match(htmlImgRegex);
   if (htmlMatch) return htmlMatch[1];
-  // Fallback to Markdown ![alt](url)
   const mdImgRegex = /!\[[^\]]*\]\(([^)\s]+(?:\s"[^"]*")?)\)/;
   const mdMatch = rawMarkdown.match(mdImgRegex);
   if (mdMatch) return mdMatch[1];
@@ -60,21 +57,17 @@ function extractFirstImage(rawMarkdown) {
 function buildPostCard(post, slug, linkPrefix = "") {
   const date = post.created_at.split("T")[0];
   const rawMarkdown = post.body || "";
-
-  // Image
   const imageUrl = extractFirstImage(rawMarkdown);
   const imageHtml = imageUrl
     ? `<img src="${imageUrl}" alt="Post preview" class="post-image" loading="lazy">`
     : "";
 
-  // Excerpt
   const rawHtml = md.render(rawMarkdown);
   let plainText = rawHtml.replace(/<[^>]*>/g, "").trim();
   plainText = decodeHtmlEntities(plainText);
   let excerpt = plainText.substring(0, 160);
   if (plainText.length > 160) excerpt += "…";
 
-  // The link prefix allows the same card to work from different locations
   const postLink = `${linkPrefix}posts/${slug}.html`;
 
   return `
@@ -97,37 +90,31 @@ async function generatePosts() {
     per_page: 100,
   });
 
-  // Security: only your issues, ignoring pull requests
   const myPosts = issues.filter(
     (issue) =>
       issue.user.login === YOUR_USERNAME && !issue.pull_request
   );
 
   console.log(`Found ${myPosts.length} post(s) from you.`);
-
-  // Sort by newest first
   myPosts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-  // Ensure output directories exist
   const postsDir = path.join(__dirname, "..", "posts");
-  const blogsDir = path.join(__dirname, "..", "blogs");
-  for (const dir of [postsDir, blogsDir]) {
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
+  const blogDir = path.join(__dirname, "..", "blog");   // changed
+  for (const dir of [postsDir, blogDir]) {
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   }
 
-  // Load templates (now inside /blogs folder)
+  // Templates now inside /blog folder
   const postTemplate = fs.readFileSync(
-    path.join(__dirname, "..", "blog", "template.html"),
+    path.join(__dirname, "..", "blog", "template.html"),   // changed
     "utf8"
   );
   const blogHomeTemplate = fs.readFileSync(
-    path.join(__dirname, "..", "blog", "blog-home.html"),
+    path.join(__dirname, "..", "blog", "blog-home.html"),  // changed
     "utf8"
   );
 
-  // ─── 1) Generate individual post pages ───
+  // ─── 1) Individual posts ───
   for (const issue of myPosts) {
     const contentHtml = md.render(issue.body || "");
     const pageHtml = postTemplate
@@ -136,12 +123,11 @@ async function generatePosts() {
       .replace(/{{CONTENT}}/g, contentHtml);
 
     const slug = slugify(issue.title) || `post-${issue.number}`;
-    const filePath = path.join(postsDir, `${slug}.html`);
-    fs.writeFileSync(filePath, pageHtml);
+    fs.writeFileSync(path.join(postsDir, `${slug}.html`), pageHtml);
     console.log(`✔ Created posts/${slug}.html`);
   }
 
-  // ─── 2) Build blog homepage (ALL posts) ───
+  // ─── 2) Blog homepage (all posts) ───
   let allPostsHtml = "";
   if (myPosts.length === 0) {
     allPostsHtml = "<p>No posts yet. Check back soon!</p>";
@@ -149,37 +135,29 @@ async function generatePosts() {
     allPostsHtml = '<div class="post-grid">';
     for (const post of myPosts) {
       const slug = slugify(post.title) || `post-${post.number}`;
-      // From /blogs/index.html, the path to posts is ../posts/
-      const card = buildPostCard(post, slug, "../");
-      allPostsHtml += card;
+      // From /blog/index.html, posts are at ../posts/
+      allPostsHtml += buildPostCard(post, slug, "../");
     }
     allPostsHtml += "</div>";
   }
 
   const blogHomeHtml = blogHomeTemplate.replace(/{{ALL_POSTS}}/g, allPostsHtml);
-  fs.writeFileSync(path.join(blogsDir, "index.html"), blogHomeHtml);
-  console.log("✔ Generated blogs/index.html");
+  fs.writeFileSync(path.join(blogDir, "index.html"), blogHomeHtml);
+  console.log("✔ Generated blog/index.html");
 
-  // ─── 3) Generate latest‑posts snippet (4 posts) ───
+  // ─── 3) Latest posts snippet (4) ───
   const latestPosts = myPosts.slice(0, 4);
   let snippetHtml = '<div class="post-grid">';
   const jsonPosts = [];
-
   for (const post of latestPosts) {
     const slug = slugify(post.title) || `post-${post.number}`;
-    // For the snippet (used from root), paths are relative to root: posts/
-    const card = buildPostCard(post, slug, "");
-    snippetHtml += card;
-
+    snippetHtml += buildPostCard(post, slug, "");   // relative to root
     jsonPosts.push({
       title: post.title,
       date: post.created_at.split("T")[0],
-      slug: slug,
+      slug,
       excerpt: decodeHtmlEntities(
-        md.render(post.body || "")
-          .replace(/<[^>]*>/g, "")
-          .trim()
-          .substring(0, 160)
+        md.render(post.body || "").replace(/<[^>]*>/g, "").trim().substring(0, 160)
       ),
       image: extractFirstImage(post.body || ""),
     });
