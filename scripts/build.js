@@ -5,7 +5,7 @@ const path = require("path");
 
 // ─── CONFIGURATION ── change these three values ──────────────
 const OWNER = "A53o";
-const REPO = "BlogPostTes";
+const REPO = "BlogPostTest";
 const YOUR_USERNAME = "A53o";
 // ──────────────────────────────────────────────────────────────
 
